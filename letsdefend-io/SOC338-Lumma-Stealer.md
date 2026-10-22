@@ -51,21 +51,28 @@ Command De-obfuscationThe PowerShell command used string replacement (-replace '
 4. Verdict & Determination
 Final Verdict: True Positive (TP)
 Justification: Host-level forensic evidence confirms successful delivery, link navigation, payload de-obfuscation, process execution, and outbound command-and-control (C2) communication.
-
+🎯 Indicators of Compromise (IOCs)
 Sender IP: 132.232.40.201 — Inbound phishing mail server
+
 Phishing Domain: windows-update.site — Fake update landing page
-Phishing URL: [https://windows-update.site/](https://windows-update.site/) — URL embedded in phishing email
+
+Phishing URL: https://windows-update.site/ — URL embedded in phishing email
+
 C2 Domain: overcoatpassably.shop — Malware host / C2 server
-Payload URL: [https://overcoatpassably.shop/Z8UZbPyVpGfdRS/maloy.mp4](https://overcoatpassably.shop/Z8UZbPyVpGfdRS/maloy.mp4) — Payload executed via mshta.exe
+
+Payload URL: https://overcoatpassably.shop/Z8UZbPyVpGfdRS/maloy.mp4 — Payload executed via mshta.exe
+
 Sender Email: update@windows-update.site — Spoofed sender address
 
-5. Actions Taken
+
+
+6. Actions Taken
 Host Containment: Network-isolated Dylan-PC via EDR to prevent lateral movement and terminate active C2 sessions.
 Credential Protection: Forced password reset and invalidated active session tokens for dylan@letsdefend.io.
 Blocklist Enforcement: Added IP 132.232.40.201, windows-update.site, and overcoatpassably.shop to firewalls, DNS filters, and secure web gateways.
 Remediation Order: Escalated host Dylan-PC to Tier 2 IR for full malware eradication and disk re-imaging.
 
-6. Lessons Learned & Recommendations
+7. Lessons Learned & Recommendations
 Detection Gap: Attackers bypassed traditional payload downloads by leveraging social engineering to force clipboard execution ("Click Fix") using native binaries (PowerShell.exe and mshta.exe).
 Email Gateway Policy: Update inbound mail rules to score newly registered domains (NRDs) more strictly and flag/quarantine emails containing interactive clipboard prompts.
 Endpoint Hardening: Deploy Attack Surface Reduction (ASR) rules to prevent PowerShell from launching child processes like mshta.exe, or block mshta.exe execution where not strictly required by business applications.
