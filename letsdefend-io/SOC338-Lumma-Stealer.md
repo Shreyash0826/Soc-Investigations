@@ -52,13 +52,12 @@ Command De-obfuscationThe PowerShell command used string replacement (-replace '
 Final Verdict: True Positive (TP)
 Justification: Host-level forensic evidence confirms successful delivery, link navigation, payload de-obfuscation, process execution, and outbound command-and-control (C2) communication.
 
-Artifact Type,Value,Context
-Sender IP,132.232.40.201,Inbound phishing mail server
-Phishing Domain,windows-update.site,Fake update landing page
-Phishing URL,https://windows-update.site/,URL embedded in phishing email
-C2 Domain,overcoatpassably.shop,Malware host / C2 server
-Payload URL,https://overcoatpassably.shop/Z8UZbPyVpGfdRS/maloy.mp4,Payload executed via mshta.exe
-Sender Email,update@windows-update.site,Spoofed sender address
+Sender IP: 132.232.40.201 — Inbound phishing mail server
+Phishing Domain: windows-update.site — Fake update landing page
+Phishing URL: [https://windows-update.site/](https://windows-update.site/) — URL embedded in phishing email
+C2 Domain: overcoatpassably.shop — Malware host / C2 server
+Payload URL: [https://overcoatpassably.shop/Z8UZbPyVpGfdRS/maloy.mp4](https://overcoatpassably.shop/Z8UZbPyVpGfdRS/maloy.mp4) — Payload executed via mshta.exe
+Sender Email: update@windows-update.site — Spoofed sender address
 
 5. Actions Taken
 Host Containment: Network-isolated Dylan-PC via EDR to prevent lateral movement and terminate active C2 sessions.
