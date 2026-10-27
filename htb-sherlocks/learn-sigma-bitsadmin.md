@@ -1,4 +1,5 @@
-# Lab Writeup: Learn Sigma (Very Easy)
+# Lab Writeup: Learn Sigma 
+
 
 **Lab Target:** `proc_creation_win_bitsadmin_download.yml`  
 **Focus Area:** Detection Logic Analysis, Living-off-the-Land Binaries (LOLBins), MITRE ATT&CK Mapping  
