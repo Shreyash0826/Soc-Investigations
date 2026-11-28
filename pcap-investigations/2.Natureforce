@@ -1,0 +1,74 @@
+# SOC Investigation Report: NatureForce PCAP Traffic Analysis
+
+- **Capture File:** `2026-10-01-traffic-analysis-exercise.pcap` (from `2026-10-01-traffic-analysis-exercise.pcap.zip`)
+- **SHA-256 (PCAP):** `287d6dee90cfef71f98a97c42e30444608de2cf59d2f7392a0a6df8dbbc8274b`
+- **Capture Window (UTC):** `2026-10-01 19:27:27.354882` to `2026-10-01 20:07:58.978031` (~40.5 min, 42,497 frames)
+- **Compromised Host:** `DESKTOP-4VGYQX7` (`DESKTOP-4VGYQX7.natureforce.com`) | IP: `10.10.1.128` | MAC: `00:22:fb:ec:7e:e7`
+- **Domain Controller:** `WIN-LEKBU2OY51N` (`natureforce.com`) | IP: `10.10.1.10` | MAC: `18:a9:9b:20:dd:f1`
+- **LAN Gateway:** `10.10.1.1` | MAC: `00:01:96:ce:dd:92`
+
+## Executive Summary
+
+On October 1, 2026, around `19:30:36 UTC`, Windows workstation `DESKTOP-4VGYQX7` (`10.10.1.128`) downloaded an executable (`runner_ilove.exe`) via `curl/8.21.0` from an external MinIO endpoint on port `9000` (`107.175.82.242:9000`), followed eight seconds later (`19:30:44 UTC`) by a persistent session on port `443` (`tcp.stream eq 130`) to `195.63.128.106:443` that ran until near the end of the capture.
+
+User `bdiaz` authenticated via Kerberos from `10.10.1.128` roughly two minutes and fifty seconds before the binary transfer began. Network traffic shows external staging/download and C2 activity, while internal traffic to `10.10.1.10` reflects normal domain client, Group Policy, RPC, and LDAP/Kerberos activity with no lateral movement to other LAN hosts observed in the PCAP.
+
+## Investigation Role Assessment
+
+| Role Label | Status | Evidence & Notes |
+| :--- | :--- | :--- |
+| `[TARGET_COMPROMISED_USER]` | `bdiaz` (Observed in PCAP) | Kerberos authentication from `10.10.1.128` (`DESKTOP-4VGYQX7`) starting at Frame `1214` (`19:27:46.250254 UTC`), ahead of the `curl/8.21.0` requests and `runner_ilove.exe` download. Host logs are still needed to confirm process execution context. |
+| `[TARGET_PIVOT_ACCOUNT]` | None observed in PCAP | No second human user appeared in Kerberos (`54` frames), no NTLM authentication identity was observed in SMB/NTLMSSP traffic, and no SMB/lateral connections to other LAN hosts appeared (`10.10.1.0/24` only shows `.1`, `.10`, and `.128`). Local privilege escalation on the host cannot be ruled out from PCAP alone. |
+| `[TARGET_ACCESSED_SERVICE]` | External C2/staging + internal AD baseline | Malicious/suspicious external endpoints include `holtandberyl.com` (`35.170.55.9:80/443`, `/prw` and `/crv`), `107.175.82.242:9000` (`/wilow/runner_ilove.exe`), and `195.63.128.106:443` (`stream 130`). Internal DC (`10.10.1.10`) services (`SMB2`, `IPC$`, `sysvol`, `KRB5`, `LDAP`, `DCERPC`) show routine client activity. |
+
+## Key Timeline (UTC)
+
+- **19:27:27.354–19:27:27.357 (Frames `1–4`):** DHCP DORA (`txid 0x7a87093f`); `10.10.1.10` leases `10.10.1.128` to `00:22:fb:ec:7e:e7` (`DESKTOP-4VGYQX7.natureforce.com`).
+- **19:27:27.706–19:27:33.407 (`stream 1`, Frames `42–805` subset):** SMB2/DCE-RPC session to `10.10.1.10:445`; mounts `IPC$` and `sysvol`, reads GPO `{31B2F340-016D-11D2-945F-00C04FB984F9}` files (`gpt.ini`, `GptTmpl.inf`, `Registry.pol`), and binds `lsarpc` and `samr`.
+- **19:27:27.911 (Frame `85`):** Machine account `desktop-4vgyqx7$` Kerberos activity begins.
+- **19:27:46.250 (Frame `1214`):** User `bdiaz` Kerberos authentication observed from `10.10.1.128`.
+- **19:28:29.995–19:29:03.663 (Frames `4921–5068`, `8228–9673`):** DNS lookups and connections to `www.ars-soar.com` (`54.201.5.185:443`, `stream 99`, Frame `4953`), `sorrelapse.best` (`44.203.10.190:443`, `stream 100`, Frame `5068`), and `holtandberyl.com` (`35.170.55.9:80/443`, `streams 114–117`, `GET /prw` and `GET /crv` via `curl/8.21.0` with `301` redirects to HTTPS via `nginx/1.24.0 (Ubuntu)`).
+- **19:30:36.732–19:30:38.873 (`stream 128`, Frames `23088–24920`):** `10.10.1.128:63723` requests `GET /wilow/runner_ilove.exe HTTP/1.1` (`curl/8.21.0`, MinIO) from `107.175.82.242:9000`; `1,646,592`-byte PE carved from `MZ` offset `681` (`1,833` stream packets).
+- **19:30:44.049–19:30:44.375 (`stream 129`, Frames `24926–24966`):** `10.10.1.128:63724` connects to `8.8.4.4:443` (`40` packets, `5,373` payload bytes) ~0.28s before `stream 130`.
+- **19:30:44.328–20:07:57.964 (`stream 130`, Frames `24963–42495`):** `10.10.1.128:63725` completes TCP handshake (`24963, 24967, 24968`) with `195.63.128.106:443` (`15,595` total packets). Outbound binary/encrypted payload starts in Frame `24969` (`173` payload packets, `83,827` payload bytes); inbound payload starts in Frame `25001` (`10,052` payload packets, `13,460,328` payload bytes).
+- **19:31:04.583–20:06:31.323 (`streams 131–183`, Frames `40140–42465`):** Post-download HTTP/TLS connections and periodic DC `10.10.1.10` SMB2 (`streams 153, 163` doing `IPC$` + `FSCTL_QUERY_NETWORK_INTERFACE_INFO` / `FSCTL_DFS_GET_REFERRALS` and clean logoffs) and RPC/LDAP/EPM traffic (`streams 169–174, 177–180`).
+
+## Indicators of Compromise (IOCs)
+
+- **File / Hash:**
+  - Filename / URI: `runner_ilove.exe` (`/wilow/runner_ilove.exe`)
+  - Carved Size: `1,646,592` bytes (`MZ` at byte offset `681` in `tcp.stream eq 128`)
+  - SHA-256: `b789adce70c028a6d17be45ec34667aa95586350ee0c4057e75b138b1ad35061`
+- **IP Addresses & Ports:**
+  - `107.175.82.242:9000` (MinIO staging/delivery server, `stream 128`)
+  - `195.63.128.106:443` (Observed C2/payload endpoint in PCAP, `stream 130`; note SOC alert listed `195.64.128.106:443`)
+  - `35.170.55.9` (Ports `80` and `443`, `streams 114–117`, associated with `holtandberyl.com`)
+  - `54.201.5.185:443` (`stream 99`, associated with `www.ars-soar.com`)
+  - `44.203.10.190:443` (`stream 100`, associated with `sorrelapse.best`)
+- **Domains & Paths:**
+  - `holtandberyl.com` (`/prw`, `/crv`)
+  - `www.ars-soar.com`
+  - `sorrelapse.best`
+- **Network / User Artifacts:**
+  - User-Agent: `curl/8.21.0`
+  - Host: `DESKTOP-4VGYQX7` (`10.10.1.128`, `00:22:fb:ec:7e:e7`)
+  - AD Account: `bdiaz`
+
+## MITRE ATT&CK Mapping (Observed Network Behavior)
+
+- **T1105 (Ingress Tool Transfer):** Downloading `runner_ilove.exe` over HTTP on port `9000` (`107.175.82.242:9000`) using `curl/8.21.0` (`stream 128`), following staging HTTP requests (`/prw`, `/crv` on `holtandberyl.com`).
+- **T1071.001 / T1571 (Application Layer Protocol / Non-Standard Port):** Long-running session on port `443` (`195.63.128.106:443`, `stream 130`) carrying non-standard/encrypted binary traffic rather than a typical TLS handshake.
+- **T1095 (Non-Application Layer Protocol):** Custom/binary or encrypted transport exchange over `stream 130` (`13,460,328` bytes inbound vs. `83,827` bytes outbound).
+
+## Containment & SOC Follow-Up Actions
+
+1. **Isolate & Image `DESKTOP-4VGYQX7` (`10.10.1.128`):** Contain the workstation to stop the ongoing `195.63.128.106:443` session and preserve volatile memory, running processes, and disk artifacts.
+2. **Block IOCs at Perimeter & Proxy/DNS:** Block `107.175.82.242`, `195.63.128.106` (and alert IP `195.64.128.106`), `35.170.55.9`, `54.201.5.185`, `44.203.10.190`, and domains `holtandberyl.com`, `www.ars-soar.com`, and `sorrelapse.best`; hunt for SHA-256 `b789adce70c028a6d17be45ec34667aa95586350ee0c4057e75b138b1ad35061` and `curl/8.21.0` or port-`9000` egress across the environment.
+3. **Review Endpoint & AD Logs for `bdiaz` and `DESKTOP-4VGYQX7`:** Check Sysmon/EDR process creation, scheduled tasks/run keys, PowerShell/script logs, and DC (`10.10.1.10`) security events around `19:27–20:08 UTC` to confirm execution chain and check for local privilege escalation or uncaptured activity.
+4. **Verify Alert Enrichment Mapping:** Check why the SOC alert referenced `195.64.128.106` while `stream 130` used `195.63.128.106` (sensor/enrichment typo vs. routing/NAT behavior).
+
+## SOC Practice Notes
+
+- **Correlate before concluding:** A Kerberos logon (`bdiaz` at `19:27:46 UTC`) occurring before a download (`19:30:36 UTC`) links the user to the host window, not automatically to the exact spawning process—always pair PCAP timelines with host process telemetry.
+- **Don't stop at port numbers:** Port `443` traffic in `stream 130` did not begin with a standard TLS handshake or HTTP text; inspecting raw payload bytes (`tcp.payload`) quickly confirmed non-plaintext/binary framing.
+- **Distinguish baseline AD noise from lateral movement:** `IPC$`, `sysvol`, `FSCTL_QUERY_NETWORK_INTERFACE_INFO`, and `FSCTL_DFS_GET_REFERRALS` to the DC are common domain behaviors; look for anomalous target hosts, administrative shares (`C$`, `ADMIN$`), failed/unusual auth, or unexpected writes.
